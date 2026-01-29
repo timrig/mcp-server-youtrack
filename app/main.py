@@ -16,30 +16,65 @@ def _require_env(name: str, default: str | None = None) -> str:
         raise RuntimeError(f"Missing environment variable: {name}")
     return v
 
-async def make_request(url, headers):
+async def make_get_request(endpoint: str, params: str):
+    token = _require_env("PERMANENT_TOKEN")
+    base_url = _require_env("BASE_URL")
+    headers = {"Authorization": f"Bearer {token}"}
+    url = f"{base_url}{endpoint}?{params}"
+
     async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
         r = await client.get(url, headers=headers)
         r.raise_for_status()
         return r.json()
-
-def build_mcp() -> FastMCP:
-    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-
+    
+async def make_post_request(endpoint: str, payload: dict[str, str]):
     token = _require_env("PERMANENT_TOKEN")
     base_url = _require_env("BASE_URL")
+    headers = {"Authorization": f"Bearer {token}"}
+    url = f"{base_url}{endpoint}"
+
+    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        r = await client.post(url, headers=headers, json=payload)
+        r.raise_for_status()
+        return r.json()
+
+def build_mcp() -> FastMCP:
+    """
+    YouTrack ist eine Webanwendung zur Fehlerverwaltung und Projektmanagement.\n
+    Sie bietet Funktionen wie Aufgabenverwaltung, Zeiterfassung, Agile-Boards und Berichterstattung.
+    """
+
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
     mcp = FastMCP("Youtrack")
 
     @mcp.tool()
-    async def youtrack_read(type: str):
-        """Sucht und liest Daten in Youtrack\n"""
-        """- type ist der Typ des angefragten Inhalts zu setzen. Setze z.B. issues, activities, articles etc."""
-
-        headers = {"Authorization": f"Bearer {token}"}
-
-        url = f"{base_url}{type}?fields=id,summary,project(name)"
-
-        return await make_request(url, headers)
+    async def read_issues():
+        """Sucht nach Fehlern in Youtrack"""
+        return await make_get_request(endpoint = "issues", params = "fields=id,summary,description,created")
+    
+    @mcp.tool()
+    async def read_articles():
+        """Sucht nach Artikeln in Youtrack"""
+        return await make_get_request(endpoint = "articles", params = "fields=hasStar,content,created,updated,id,idReadable,reporter(name),summary,project(shortName),content")
+    
+    @mcp.tool()
+    async def read_projects():
+        """Sucht nach Projekten in Youtrack"""
+        return await make_get_request(endpoint = "admin/projects", params = "fields=id,name,shortName")
+    
+    @mcp.tool()
+    async def set_new_issue(project_id: str, summary: str, description: str):
+        """
+        Erstellt für ein Projekt einen neuen Fehler.\n
+        Falls der User keine project_id oder project_name angibt, muss diese zuvor ermittelt oder abgefragt werden.
+        """
+        payload = {
+            "project": {"id": project_id},
+            "summary": summary,
+            "description": description
+        }
+        return await make_post_request(endpoint = "issues", payload = payload)
 
     return mcp
 
