@@ -2,7 +2,10 @@
 
 
 ## Tools
-- `youtrack_read`: Fragt issues, articles, activities etc. ab
+- `read_issues`: Suche nach Fehlern
+- `read_articles`: Suche nach Artikeln
+- `read_projects`: Suche nach Projekten
+- `set_new_issue`: Erstellt einen neuen Fehler für ein Projekt
 
 
 ## Umgebungsvariablen
